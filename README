@@ -1,0 +1,69 @@
+Tags v0.1
+=========
+
+An adaptation of Freetag folksonony/tagging system for Kohana 2.3.x.
+
+Installation
+=============
+
+Installation is relatively easy. You will need to create atleast two database tables for each object you wish to tag. The first table, which I call "tags" stores each individual tag. The second table, which I call "taggings", stores each time an object is tagged. An object in this case can be anything; a blog post, an image, a comment, whatever. If you want to use your own naming convention for tags/taggings tables, all you need to do is change the config to reflect that.
+
+1. First we'll need to create the tables. The SQL for MySQL is provided below, you should be able to adapt this for other databases. You will need to make a few changes to this SQL for your specific use. Lets say you want to add tags to blog posts. You may want to rename these tables to 'post_tags' and 'post_taggings'. In addition to this you will also need to change the foreign key if you want ORM support (more on that later), so within the SQL you will want to change the foreign key 'object_id' to whatever your foreign key should be, such as 'post_id'.
+
+2. Once you have your tables created, you will need to change the configuration file to reflect these changes. Within the config/tags.php config file, the items you want to focus on are 'tag_table', 'tagging_table' and 'object_foreign_key'. So in this case, we would set 'tag_table' to 'post_tags', 'tagging_table' to 'post_taggings', and 'object_foreign_key' to 'post_id'. Note that table names need to be plural.
+
+3. Now we will need to setup our models. The Tags module includes two example models which you can use. You'll want to rename the models to reflect your new tables. So in our example, we'll rename tag.php to post_tag.php and the class from Tag_Model to Post_Tag_Model, then we'll want to change tagging.php to post_tagging.php and rename the class Tagging_Model to Post_Tagging_Model. We'll then want to update the relationships within the Tagging model (Post_Tagging_Model). We'll change:
+
+	protected $belongs_to = array('tags', 'users');
+
+to 
+
+	protected $belongs_to = array('tags', 'users', 'posts');
+
+That way we'll have ORM support for our tagged object.
+
+4. Once that is all setup we can begin using the Tags module. The Tags module has factory() and instance() methods like many other Kohana libraries/modules. So you can begin tagging with one line of code:
+
+	$tag = Tags::instance()->tag_object(1, 1, 'This is a tag, this is another tag');
+
+5. Now what if you have MULTIPLE objects that you want to tag? Well, first you'll need to go through steps 1-3 for each object. But now we'll have to do things a little differently, for each seperate object we ant to tag, we'll need to instantiate the Tags object to use that specific object's tables and foreign key. In the blog post example:
+
+	$tags = Tags::instance(array('tag_table' => 'post_tags', 'tagging_table' => 'post_taggings', 'object_foreign_key' => 'post_id'))->tag_object(...);
+
+I know that's a mouthful. But you can also just create a seperate $config array for each object you want to tag:
+
+Things to note
+==============
+
+* Tags depends upon there being a 'users' table. So it works very well in conjunction with the Auth module. I plan to add support for other table names for user_id's, but as of 0.1, it only supports a 'users' table.
+
+* Use the tags_demo.php controller for a demonstration on the features available in the Tags module (in the works). If confused, just review the source to see detailed descriptions of each method.
+
+* Tags is a work-in-progress, so please report any bugs you find. Some of the methods are somewhat experimental and haven't been performance tested, so be aware of that when using it.
+
+SQL
+===
+
+CREATE TABLE IF NOT EXISTS `tags` (
+  `id` int(10) unsigned NOT NULL auto_increment,
+  `tag` varchar(30) NOT NULL default '',
+  `raw_tag` varchar(50) NOT NULL default '',
+  PRIMARY KEY  (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+CREATE TABLE IF NOT EXISTS `taggings` (
+  `id` int(11) unsigned NOT NULL auto_increment,
+  `tag_id` int(11) unsigned NOT NULL,
+  `object_id` int(11) unsigned NOT NULL,
+  `user_id` int(11) unsigned NOT NULL,
+  `created` int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`id`),
+  KEY `object_id` (`object_id`),
+  KEY `tag_id` (`tag_id`),
+  KEY `user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+ALTER TABLE `taggings`
+  ADD CONSTRAINT `taggings_ibfk_3` FOREIGN KEY (`object_id`) REFERENCES `objects` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `taggings_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `taggings_ibfk_1` FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`) ON DELETE CASCADE;
